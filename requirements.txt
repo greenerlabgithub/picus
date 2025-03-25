@@ -1,0 +1,6 @@
+# requirements.txt
+opencv-python
+numpy
+pillow
+openpyxl
+azure-functions
