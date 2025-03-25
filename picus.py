@@ -1,3 +1,6 @@
+import logging
+import azure.functions as func
+
 import sys
 import json
 import base64
@@ -6,11 +9,12 @@ import numpy as np
 import openpyxl
 import os
 from openpyxl.styles import Alignment, Border, Side
-from openpyxl.drawing.image import Image as XLImage  # 이미지 삽입용 (Pillow 필요)
+from openpyxl.drawing.image import Image as XLImage
 
-# ---------------------------
-# 전역: 색상 범위 (HSV)
-# ---------------------------
+# --------------------------------
+# (1) 런북 코드 재활용
+# --------------------------------
+
 color_ranges = {
     "검정":  ((0,   0,   0),   (10, 255,  50)),
     "갈색":  ((10,  80,  5),   (30, 255, 255)),
@@ -23,11 +27,9 @@ color_ranges = {
     "나무표시2":((3,  240,150),  (10, 255, 255))
 }
 
-# 등급 카운트 (전역)
 grade_count = {"A":0, "B":0, "C":0, "D":0, "E":0}
 
 def calc_grade(ratio: float) -> str:
-    """초록+보라+파랑 비율(ratio)에 따라 등급 산정"""
     if 0 <= ratio < 1:
         return "A"
     elif 1 <= ratio <= 19:
@@ -40,40 +42,36 @@ def calc_grade(ratio: float) -> str:
         return "E"
 
 def analyze_one_image(tree_id: str, image_path: str):
-    """단일 이미지를 분석하여 색상 픽셀수/등급 정보를 반환. 실패 시 None."""
     if not os.path.exists(image_path):
-        print(f"[오류] 파일 없음: {image_path}")
+        logging.info(f"[오류] 파일 없음: {image_path}")
         return None
 
     img_bgr = cv2.imread(image_path)
     if img_bgr is None:
-        print(f"[오류] OpenCV로 읽지 못함: {image_path}")
+        logging.info(f"[오류] OpenCV로 읽지 못함: {image_path}")
         return None
 
     img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
 
-    # 나무둘레+표시+표시2 합치기
     outer_mask = np.zeros(img_hsv.shape[:2], dtype=np.uint8)
     for key in ["나무둘레", "나무표시", "나무표시2"]:
         lo, up = color_ranges[key]
         tmp = cv2.inRange(img_hsv, lo, up)
         outer_mask = cv2.bitwise_or(outer_mask, tmp)
 
-    # 모폴로지
     kernel = np.ones((3,3), np.uint8)
     outer_mask = cv2.dilate(outer_mask, kernel, iterations=1)
     outer_mask = cv2.erode(outer_mask, kernel, iterations=1)
 
     contours, _ = cv2.findContours(outer_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        print(f"[결과] 외곽 컨투어 없음: {image_path}")
+        logging.info(f"[결과] 외곽 컨투어 없음: {image_path}")
         return None
 
     largest = max(contours, key=cv2.contourArea)
     roi_mask = np.zeros(img_bgr.shape[:2], dtype=np.uint8)
     cv2.drawContours(roi_mask, [largest], -1, 255, -1)
 
-    # 5색
     target_colors = ["검정", "갈색", "초록", "보라", "파랑"]
     color_counts = {}
     for c in target_colors:
@@ -85,14 +83,12 @@ def analyze_one_image(tree_id: str, image_path: str):
 
     sum_of_5 = sum(color_counts.values())
     if sum_of_5 == 0:
-        print(f"[결과] 5색 픽셀 없음: {image_path}")
+        logging.info(f"[결과] 5색 픽셀 없음: {image_path}")
         return None
 
-    # 검정+갈색
     black_brown = color_counts["검정"] + color_counts["갈색"]
     black_brown_ratio = round((black_brown / sum_of_5)*100, 2)
 
-    # 초록+보라+파랑
     gpb = color_counts["초록"] + color_counts["보라"] + color_counts["파랑"]
     gpb_ratio = round((gpb / sum_of_5)*100, 2)
 
@@ -111,14 +107,9 @@ def analyze_one_image(tree_id: str, image_path: str):
     }
 
 def analyze_multiple_images(image_list, excel_filename="analysis_multi.xlsx"):
-    """
-    여러 이미지를 한 번에 분석 → 하나의 엑셀로 작성.
-    image_list: [(수목번호, 이미지경로), (...), ...]
-    """
     global grade_count
     grade_count = {"A":0, "B":0, "C":0, "D":0, "E":0}
 
-    # 엑셀 덮어쓰기
     if os.path.exists(excel_filename):
         os.remove(excel_filename)
 
@@ -126,11 +117,8 @@ def analyze_multiple_images(image_list, excel_filename="analysis_multi.xlsx"):
     ws = wb.active
     ws.title = "분석결과"
 
-    # 1행 병합 → "음파단층촬영 조사현황"
     ws.merge_cells("A1:G1")
     ws["A1"] = "음파단층촬영 조사현황"
-
-    # 2행 헤더
     ws.append(["수목번호", "이미지", "구분", "픽셀수", "합계", "비율(%)", "등급"])
 
     current_row = 3
@@ -153,35 +141,30 @@ def analyze_multiple_images(image_list, excel_filename="analysis_multi.xlsx"):
         start_row = current_row
         end_row   = start_row + 4
 
-        # A,B,G 병합
         ws.merge_cells(start_row=start_row, start_column=1, end_row=end_row, end_column=1)  # A
         ws.merge_cells(start_row=start_row, start_column=2, end_row=end_row, end_column=2)  # B
         ws.merge_cells(start_row=start_row, start_column=7, end_row=end_row, end_column=7)  # G
 
         ws.cell(row=start_row, column=1, value=tree_id)
-        ws.cell(row=start_row, column=2, value=img_path)  # 텍스트로 경로 남김
+        ws.cell(row=start_row, column=2, value=img_path)
         ws.cell(row=start_row, column=7, value=overall_grade)
 
-        # E/F 병합 (검정+갈색)
-        ws.merge_cells(start_row=start_row,       start_column=5, end_row=start_row+1, end_column=5)
-        ws.merge_cells(start_row=start_row,       start_column=6, end_row=start_row+1, end_column=6)
+        ws.merge_cells(start_row=start_row, start_column=5, end_row=start_row+1, end_column=5)
+        ws.merge_cells(start_row=start_row, start_column=6, end_row=start_row+1, end_column=6)
         ws.cell(row=start_row,   column=5, value=black_brown_count)
         ws.cell(row=start_row,   column=6, value=black_brown_ratio)
 
-        # E/F 병합 (초록+보라+파랑)
-        ws.merge_cells(start_row=start_row+2,     start_column=5, end_row=end_row, end_column=5)
-        ws.merge_cells(start_row=start_row+2,     start_column=6, end_row=end_row, end_column=6)
+        ws.merge_cells(start_row=start_row+2, start_column=5, end_row=end_row, end_column=5)
+        ws.merge_cells(start_row=start_row+2, start_column=6, end_row=end_row, end_column=6)
         ws.cell(row=start_row+2, column=5, value=gpb_count)
         ws.cell(row=start_row+2, column=6, value=gpb_ratio)
 
-        # C/D : 5색
         c_list = ["검정", "갈색", "초록", "보라", "파랑"]
         for i, cname in enumerate(c_list):
             r = start_row + i
             ws.cell(row=r, column=3, value=cname)
             ws.cell(row=r, column=4, value=color_counts[cname])
 
-        # (추가) 이미지 삽입
         if os.path.exists(img_path):
             try:
                 excel_img = XLImage(img_path)
@@ -197,14 +180,13 @@ def analyze_multiple_images(image_list, excel_filename="analysis_multi.xlsx"):
                 ws.column_dimensions["B"].width = 17.5
 
             except Exception as e:
-                print(f"[이미지삽입오류] {img_path}: {e}")
+                logging.info(f"[이미지삽입오류] {img_path}: {e}")
 
         current_row += 5
 
-    # 등급표 (J1~L1 헤더, J2~L6 데이터)
-    ws.cell(row=1, column=10, value="등급")  
-    ws.cell(row=1, column=11, value="기준") 
-    ws.cell(row=1, column=12, value="수량") 
+    ws.cell(row=1, column=10, value="등급")
+    ws.cell(row=1, column=11, value="기준")
+    ws.cell(row=1, column=12, value="수량")
 
     grade_table = [
         ("A",   "0",      grade_count["A"]),
@@ -220,7 +202,6 @@ def analyze_multiple_images(image_list, excel_filename="analysis_multi.xlsx"):
         ws.cell(row=rr, column=11, value=criteria)
         ws.cell(row=rr, column=12, value=qty)
 
-    # 테두리 & 중앙정렬
     thin_side = Side(style="thin", color="000000")
     thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
 
@@ -236,51 +217,64 @@ def analyze_multiple_images(image_list, excel_filename="analysis_multi.xlsx"):
             cell.border = thin_border
 
     wb.save(excel_filename)
-    print(f"[결과] 전체 {len(image_list)}개 이미지 분석 완료 → {excel_filename}")
+    logging.info(f"[결과] 전체 {len(image_list)}개 이미지 분석 완료 → {excel_filename}")
 
-# ---------------------------------------------------
-# 추가 함수: JSON 파라미터를 받아 Base64→파일→리스트
-# ---------------------------------------------------
 def decode_and_run(json_str):
     data = json.loads(json_str)
-
     image_list = []
-    # img1Num, img1, img2Num, img2, ... 이런 식으로 들어온다고 가정
-    for i in range(1, 16):  # 최대 15장
-        num_key  = f"img{i}Num"  # 예: "img1Num"
-        img_key  = f"img{i}"     # 예: "img1"
+    for i in range(1, 16):
+        num_key  = f"img{i}Num"
+        img_key  = f"img{i}"
         if num_key in data and img_key in data:
             tree_id = data[num_key]
             b64_str = data[img_key]
-
             if not b64_str:
-                # Base64가 비어 있으면 스킵
                 continue
-
             local_path = f"temp_img{i}.jpg"
             with open(local_path, "wb") as f:
                 f.write(base64.b64decode(b64_str))
-
             image_list.append((tree_id, local_path))
 
     if not image_list:
-        print("[결과] 디코딩된 이미지가 하나도 없습니다.")
+        logging.info("[결과] 디코딩된 이미지가 하나도 없습니다.")
         return
-
     excel_out = "analysis.xlsx"
     analyze_multiple_images(image_list, excel_out)
 
+# --------------------------------
+# (2) Azure Function main() 함수
+# --------------------------------
+def main(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Azure Function의 HTTP Trigger 엔트리 포인트
+    """
+    logging.info("Python HTTP trigger function processed a request.")
 
-# ---------------------------
-# 메인 실행부
-# ---------------------------
-if __name__ == "__main__":
-    # 파라미터가 없으면 종료
-    if len(sys.argv) < 2:
-        print("[종료] 파라미터가 없어 실행을 종료합니다.")
-        import sys
-        sys.exit(0)
+    # 1) HTTP Body 읽기
+    try:
+        body_str = req.get_body().decode('utf-8')
+    except:
+        return func.HttpResponse("Invalid request body", status_code=400)
 
-    # 파라미터가 있으면 decode_and_run
-    param_str = sys.argv[1]
-    decode_and_run(param_str)
+    # 2) decode_and_run 호출
+    decode_and_run(body_str)
+
+    # 3) 엑셀 파일을 Base64로 응답 (또는 그냥 "Success" 반환)
+    excel_file = "analysis.xlsx"
+    if os.path.exists(excel_file):
+        with open(excel_file, "rb") as f:
+            excel_bytes = f.read()
+        # base64로 인코딩
+        excel_b64 = base64.b64encode(excel_bytes).decode("utf-8")
+        # JSON 형태로 응답
+        resp_data = {
+            "result": "success",
+            "excelBase64": excel_b64
+        }
+        return func.HttpResponse(
+            json.dumps(resp_data),
+            status_code=200,
+            mimetype="application/json"
+        )
+    else:
+        return func.HttpResponse("No excel output generated.", status_code=200)
