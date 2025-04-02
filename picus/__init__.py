@@ -10,6 +10,8 @@ import openpyxl
 import os
 from openpyxl.styles import Alignment, Border, Side
 from openpyxl.drawing.image import Image as XLImage
+if not hasattr(os, "add_dll_directory"):
+    os.add_dll_directory = lambda x: None
 
 # ---------------------------
 # 전역: 색상 범위 (HSV)
