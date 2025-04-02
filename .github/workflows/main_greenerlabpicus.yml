@@ -69,13 +69,7 @@ jobs:
         with:
           app-name: 'greenerlabpicus'
           slot-name: 'Production'
-<<<<<<< HEAD
-          package: ".python_packages/lib/site-packages"
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C47CA8B33E2B4633ADA8D7C25FC938A3 }}
-          sku: 'flexconsumption'
-=======
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_1D768A29B4C6441CA4E55F1623DD2C4D }}
           sku: 'flexconsumption'
->>>>>>> 4e89a76ecbc82747e542cae87571cc8f277a4eaa
         
