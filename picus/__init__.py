@@ -314,7 +314,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(
             json.dumps(resp_data),
             status_code=200,
-            headers={"Content-Type": "text/plain"}
+            headers={"Content-Type": "application/json"}
         )
     else:
         return func.HttpResponse("No excel output generated.", status_code=200)
