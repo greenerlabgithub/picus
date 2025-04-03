@@ -13,8 +13,6 @@ import numpy as np
 import openpyxl
 from openpyxl.styles import Alignment, Border, Side
 from openpyxl.drawing.image import Image as XLImage
-if not hasattr(os, "add_dll_directory"):
-    os.add_dll_directory = lambda x: None
 
 # ---------------------------
 # 전역: 색상 범위 (HSV)
@@ -272,7 +270,7 @@ def decode_and_run(json_str):
             b64_str = data[img_key]
             if not b64_str:
                 continue
-            local_path = f"temp_img{i}.jpg"
+            local_path = os.path.join("/tmp", f"temp_img{i}.jpg")
             with open(local_path, "wb") as f:
                 f.write(base64.b64decode(b64_str))
             image_list.append((tree_id, local_path))
