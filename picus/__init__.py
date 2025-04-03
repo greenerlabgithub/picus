@@ -311,10 +311,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             "result": "success",
             "excelBase64": excel_b64
         }
-        return func.HttpResponse(
-            json.dumps(resp_data),
+        return func.JsonResponse(
+            resp_data,
             status_code=200,
-            mimetype="application/json"
         )
     else:
         return func.HttpResponse("No excel output generated.", status_code=200)
