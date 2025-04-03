@@ -279,7 +279,7 @@ def decode_and_run(json_str):
         logging.info("[결과] 디코딩된 이미지가 하나도 없습니다.")
         return
 
-    excel_out = "analysis.xlsx"
+    excel_out = os.path.join("/tmp", "analysis.xlsx")
     analyze_multiple_images(image_list, excel_out)
 
 # ---------------------------
@@ -301,7 +301,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     decode_and_run(body_str)
 
     # 3) 분석 후 생성된 엑셀 파일을 Base64로 변환하여 응답
-    excel_file = "analysis.xlsx"
+    excel_file = "/tmp/analysis.xlsx"
     if os.path.exists(excel_file):
         with open(excel_file, "rb") as f:
             excel_bytes = f.read()
