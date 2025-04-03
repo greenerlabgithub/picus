@@ -307,8 +307,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             excel_bytes = f.read()
         excel_b64 = base64.b64encode(excel_bytes).decode("utf-8")
 
+        resp_data = {
+            "result": "success",
+            "excelBase64": excel_b64
+        }
         return func.HttpResponse(
-            excel_b64,
+            json.dumps(resp_data),
             status_code=200,
             headers={"Content-Type": "text/plain"}
         )
