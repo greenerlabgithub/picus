@@ -3,3 +3,4 @@ numpy
 pillow
 openpyxl
 azure-functions
+azure-storage-blob
