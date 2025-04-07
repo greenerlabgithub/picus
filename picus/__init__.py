@@ -1,5 +1,9 @@
+import os
+if not hasattr(os, "add_dll_directory"):
+    os.add_dll_directory = lambda x: None
 import logging
 import azure.functions as func
+
 
 import sys
 import json
@@ -7,7 +11,6 @@ import base64
 import cv2
 import numpy as np
 import openpyxl
-import os
 from openpyxl.styles import Alignment, Border, Side
 from openpyxl.drawing.image import Image as XLImage
 
@@ -270,7 +273,7 @@ def decode_and_run(json_str):
             b64_str = data[img_key]
             if not b64_str:
                 continue
-            local_path = f"temp_img{i}.jpg"
+            local_path = os.path.join("/tmp", f"temp_img{i}.jpg")
             with open(local_path, "wb") as f:
                 f.write(base64.b64decode(b64_str))
             image_list.append((tree_id, local_path))
@@ -279,7 +282,7 @@ def decode_and_run(json_str):
         logging.info("[결과] 디코딩된 이미지가 하나도 없습니다.")
         return
 
-    excel_out = "analysis.xlsx"
+    excel_out = os.path.join("/tmp", "analysis.xlsx")
     analyze_multiple_images(image_list, excel_out)
 
 # ---------------------------
@@ -301,13 +304,18 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     decode_and_run(body_str)
 
     # 3) 분석 후 생성된 엑셀 파일을 Base64로 변환하여 응답
+<<<<<<< HEAD
     excel_file = "analysis.xlsx"
 # 변경된 코드 (엑셀 파일을 Blob Storage에 업로드)
+=======
+    excel_file = "/tmp/analysis.xlsx"
+>>>>>>> cfe5eca68a682fefcfe3ef6fdfbd2b27beab2a36
     if os.path.exists(excel_file):
         try:
             with open(excel_file, "rb") as f:
                 file_data = f.read()
 
+<<<<<<< HEAD
             # Blob Storage 연결 및 업로드 시작
             connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
             if not connect_str:
@@ -335,6 +343,17 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         except Exception as e:
             logging.error(f"Error uploading file to Blob Storage: {e}")
             return func.HttpResponse("Error uploading file to Blob Storage", status_code=500)
+=======
+        resp_data = {
+            "result": "success",
+            "excelBase64": excel_b64
+        }
+        return func.HttpResponse(
+            json.dumps(resp_data),
+            status_code=200,
+            headers={"Content-Type": "application/json"}
+        )
+>>>>>>> cfe5eca68a682fefcfe3ef6fdfbd2b27beab2a36
     else:
         return func.HttpResponse("No excel output generated.", status_code=200)
 
