@@ -11,6 +11,9 @@ import os
 from openpyxl.styles import Alignment, Border, Side
 from openpyxl.drawing.image import Image as XLImage
 
+# Blob Storage 관련 import 추가
+from azure.storage.blob import BlobServiceClient, ContentSettings
+
 # ---------------------------
 # 전역: 색상 범위 (HSV)
 # ---------------------------
@@ -299,19 +302,39 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     # 3) 분석 후 생성된 엑셀 파일을 Base64로 변환하여 응답
     excel_file = "analysis.xlsx"
+# 변경된 코드 (엑셀 파일을 Blob Storage에 업로드)
     if os.path.exists(excel_file):
-        with open(excel_file, "rb") as f:
-            excel_bytes = f.read()
-        excel_b64 = base64.b64encode(excel_bytes).decode("utf-8")
+        try:
+            with open(excel_file, "rb") as f:
+                file_data = f.read()
 
-        resp_data = {
-            "result": "success",
-            "excelBase64": excel_b64
-        }
-        return func.HttpResponse(
-            json.dumps(resp_data),
-            status_code=200,
-            mimetype="application/json"
-        )
+            # Blob Storage 연결 및 업로드 시작
+            connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+            if not connect_str:
+                logging.error("AZURE_STORAGE_CONNECTION_STRING not set.")
+                return func.HttpResponse("Storage connection string not set", status_code=500)
+
+            blob_service_client = BlobServiceClient.from_connection_string(connect_str)
+            container_name = "greenerlab"  # 실제 컨테이너 이름
+            blob_path = "streetxlsx/picus.xlsx"  # 업로드할 Blob 경로 및 파일명
+
+            container_client = blob_service_client.get_container_client(container_name)
+            try:
+                container_client.create_container()
+            except Exception as e:
+                logging.info(f"Container may already exist: {e}")
+
+            blob_client = container_client.get_blob_client(blob_path)
+            content_settings = ContentSettings(
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
+            # Blob Storage 업로드 완료
+
+            return func.HttpResponse("success", status_code=200)
+        except Exception as e:
+            logging.error(f"Error uploading file to Blob Storage: {e}")
+            return func.HttpResponse("Error uploading file to Blob Storage", status_code=500)
     else:
         return func.HttpResponse("No excel output generated.", status_code=200)
+
