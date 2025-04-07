@@ -1,3 +1,7 @@
+import os
+if not hasattr(os, "add_dll_directory"):
+    os.add_dll_directory = lambda x: None
+
 import logging
 import azure.functions as func
 
@@ -7,7 +11,6 @@ import base64
 import cv2
 import numpy as np
 import openpyxl
-import os
 from openpyxl.styles import Alignment, Border, Side
 from openpyxl.drawing.image import Image as XLImage
 
