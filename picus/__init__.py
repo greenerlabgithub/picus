@@ -1,9 +1,5 @@
-import os
-if not hasattr(os, "add_dll_directory"):
-    os.add_dll_directory = lambda x: None
 import logging
 import azure.functions as func
-
 
 import sys
 import json
@@ -11,6 +7,7 @@ import base64
 import cv2
 import numpy as np
 import openpyxl
+import os
 from openpyxl.styles import Alignment, Border, Side
 from openpyxl.drawing.image import Image as XLImage
 
@@ -273,7 +270,7 @@ def decode_and_run(json_str):
             b64_str = data[img_key]
             if not b64_str:
                 continue
-            local_path = os.path.join("/tmp", f"temp_img{i}.jpg")
+            local_path = f"temp_img{i}.jpg"
             with open(local_path, "wb") as f:
                 f.write(base64.b64decode(b64_str))
             image_list.append((tree_id, local_path))
@@ -282,7 +279,7 @@ def decode_and_run(json_str):
         logging.info("[결과] 디코딩된 이미지가 하나도 없습니다.")
         return
 
-    excel_out = os.path.join("/tmp", "analysis.xlsx")
+    excel_out = "analysis.xlsx"
     analyze_multiple_images(image_list, excel_out)
 
 # ---------------------------
@@ -297,33 +294,28 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     # 1) HTTP Body 읽기 (JSON)
     try:
         body_str = req.get_body().decode('utf-8')
-    except:
+    except Exception as e:
+        logging.error(f"Error reading request body: {e}")
         return func.HttpResponse("Invalid request body", status_code=400)
 
     # 2) 분석 로직 실행
     decode_and_run(body_str)
 
-    # 3) 분석 후 생성된 엑셀 파일을 Base64로 변환하여 응답
-<<<<<<< HEAD
-    excel_file = "analysis.xlsx"
-# 변경된 코드 (엑셀 파일을 Blob Storage에 업로드)
-=======
+    # 3) 생성된 엑셀 파일을 Blob Storage에 업로드
     excel_file = "/tmp/analysis.xlsx"
->>>>>>> cfe5eca68a682fefcfe3ef6fdfbd2b27beab2a36
     if os.path.exists(excel_file):
         try:
             with open(excel_file, "rb") as f:
                 file_data = f.read()
 
-<<<<<<< HEAD
-            # Blob Storage 연결 및 업로드 시작
+            # Blob Storage 연결 및 업로드
             connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
             if not connect_str:
                 logging.error("AZURE_STORAGE_CONNECTION_STRING not set.")
                 return func.HttpResponse("Storage connection string not set", status_code=500)
 
             blob_service_client = BlobServiceClient.from_connection_string(connect_str)
-            container_name = "greenerlab"  # 실제 컨테이너 이름
+            container_name = "greenerlab"  # 실제 컨테이너 이름으로 변경
             blob_path = "streetxlsx/picus.xlsx"  # 업로드할 Blob 경로 및 파일명
 
             container_client = blob_service_client.get_container_client(container_name)
@@ -337,23 +329,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
-            # Blob Storage 업로드 완료
 
             return func.HttpResponse("success", status_code=200)
         except Exception as e:
             logging.error(f"Error uploading file to Blob Storage: {e}")
             return func.HttpResponse("Error uploading file to Blob Storage", status_code=500)
-=======
-        resp_data = {
-            "result": "success",
-            "excelBase64": excel_b64
-        }
-        return func.HttpResponse(
-            json.dumps(resp_data),
-            status_code=200,
-            headers={"Content-Type": "application/json"}
-        )
->>>>>>> cfe5eca68a682fefcfe3ef6fdfbd2b27beab2a36
     else:
         return func.HttpResponse("No excel output generated.", status_code=200)
 
