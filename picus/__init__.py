@@ -318,7 +318,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 return func.HttpResponse("Storage connection string not set", status_code=500)
 
             blob_service_client = BlobServiceClient.from_connection_string(connect_str)
-            container_name = "greenerlab"  # 실제 컨테이너 이름으로 변경
+            container_name = "streetxlsx"  # 실제 컨테이너 이름으로 변경
             blob_path = "streetxlsx/picus.xlsx"  # 업로드할 Blob 경로 및 파일명
 
             container_client = blob_service_client.get_container_client(container_name)
