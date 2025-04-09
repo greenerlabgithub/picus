@@ -305,10 +305,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(f"Error reading request body: {e}")
         return func.HttpResponse("Invalid request body", status_code=400)
 
-    # 2) 분석 로직 실행
-    decode_and_run(body_str)
-
-    # 3) 생성된 엑셀 파일을 Blob Storage에 업로드
     excel_file = decode_and_run(body_str)
     if os.path.exists(excel_file):
         try:
@@ -337,7 +333,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             )
             blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
 
-            return func.HttpResponse(json.dumps({"result": "success"}), status_code=200)
+            return func.HttpResponse(json.dumps({"result": "success"}), status_code=200,headers={"Content-Type": "application/json"})
         except Exception as e:
             logging.error(f"Error uploading file to Blob Storage: {e}")
             return func.HttpResponse("Error uploading file to Blob Storage", status_code=500)
