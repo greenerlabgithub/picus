@@ -337,7 +337,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             )
             blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
 
-            return func.HttpResponse("success", status_code=200)
+            return func.HttpResponse(json.dumps({"result": "success"}), status_code=200)
         except Exception as e:
             logging.error(f"Error uploading file to Blob Storage: {e}")
             return func.HttpResponse("Error uploading file to Blob Storage", status_code=500)
