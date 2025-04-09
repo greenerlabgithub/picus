@@ -282,7 +282,7 @@ def decode_and_run(json_str):
         logging.info("[결과] 디코딩된 이미지가 하나도 없습니다.")
         return
 
-    excel_out = "analysis.xlsx"
+    excel_out = os.path.join("/tmp", "analysis.xlsx")
     analyze_multiple_images(image_list, excel_out)
 
 # ---------------------------
