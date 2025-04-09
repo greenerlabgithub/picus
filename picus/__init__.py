@@ -273,7 +273,7 @@ def decode_and_run(json_str):
             b64_str = data[img_key]
             if not b64_str:
                 continue
-            local_path = f"temp_img{i}.jpg"
+            local_path = os.path.join("/tmp", f"temp_img{i}.jpg")
             with open(local_path, "wb") as f:
                 f.write(base64.b64decode(b64_str))
             image_list.append((tree_id, local_path))
