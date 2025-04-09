@@ -255,24 +255,19 @@ def analyze_multiple_images(image_list, excel_filename="analysis.xlsx"):
     logging.info(f"[결과] 전체 {len(image_list)}개 이미지 분석 완료 → {excel_filename}")
 
 def decode_and_run(json_str):
-    """
-    JSON 문자열을 받아,
-    Base64 이미지 + 번호를 temp_img{i}.jpg로 저장,
-    analyze_multiple_images() 호출,
-    analysis.xlsx 생성
-    """
     data = json.loads(json_str)
     image_list = []
 
     # 최대 15장 예시
     for i in range(1, 16):
-        num_key  = f"img{i}Num"
-        img_key  = f"img{i}"
+        num_key = f"img{i}Num"
+        img_key = f"img{i}"
         if num_key in data and img_key in data:
             tree_id = data[num_key]
             b64_str = data[img_key]
             if not b64_str:
                 continue
+            # 쓰기 권한이 있는 /tmp 디렉터리를 사용합니다.
             local_path = os.path.join("/tmp", f"temp_img{i}.jpg")
             with open(local_path, "wb") as f:
                 f.write(base64.b64decode(b64_str))
@@ -280,10 +275,19 @@ def decode_and_run(json_str):
 
     if not image_list:
         logging.info("[결과] 디코딩된 이미지가 하나도 없습니다.")
-        return
+        return None
 
-    excel_out = os.path.join("/tmp", "analysis.xlsx")
-    analyze_multiple_images(image_list, excel_out)
+    # JSON에 전달된 "Name" 필드를 추출하여 파일명 생성 (앞뒤 공백 제거)
+    name_prefix = data.get("Name", "").strip()
+    if name_prefix:
+        excel_filename = os.path.join("/tmp", f"{name_prefix}_picus.xlsx")
+    else:
+        excel_filename = os.path.join("/tmp", "picus.xlsx")
+    
+    analyze_multiple_images(image_list, excel_filename)
+    
+    # 생성된 파일명을 반환합니다.
+    return excel_filename
 
 # ---------------------------
 # 메인 함수 (HTTP Trigger)
@@ -305,7 +309,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     decode_and_run(body_str)
 
     # 3) 생성된 엑셀 파일을 Blob Storage에 업로드
-    excel_file = "/tmp/analysis.xlsx"
+    excel_file = decode_and_run(body_str)
     if os.path.exists(excel_file):
         try:
             with open(excel_file, "rb") as f:
@@ -319,7 +323,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
             blob_service_client = BlobServiceClient.from_connection_string(connect_str)
             container_name = "streetxlsx"  # 실제 컨테이너 이름으로 변경
-            blob_path = "streetxlsx/picus.xlsx"  # 업로드할 Blob 경로 및 파일명
+            blob_path = os.path.basename(excel_file)
 
             container_client = blob_service_client.get_container_client(container_name)
             try:
