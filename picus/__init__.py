@@ -278,7 +278,7 @@ def decode_and_run(json_str):
         return None
 
     # JSON에 전달된 "Name" 필드를 추출하여 파일명 생성 (앞뒤 공백 제거)
-    name_prefix = data.get("Name", "").strip()
+    name_prefix = data.get("Name", "")
     if name_prefix:
         excel_filename = os.path.join("/tmp", f"{name_prefix}_picus.xlsx")
     else:
